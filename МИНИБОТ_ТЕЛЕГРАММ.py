@@ -4,11 +4,14 @@ import threading
 from flask import Flask
 import os
 
+# --- НАСТРОЙКИ РЕЖИМА ---
+IS_ACTIVE = False  # ПОСТАВЬ True, ЧТОБЫ БОТ СНОВА ЗАРАБОТАЛ
+OFFLINE_MESSAGE = "Бот временно деактивирован. По всем вопросам писать в @BHJ_WORK"
+
 # --- ПОЛУЧЕНИЕ КЛЮЧЕЙ ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# Чистка ключей (безопасность)
 if TELEGRAM_TOKEN:
     TELEGRAM_TOKEN = TELEGRAM_TOKEN.strip()
 if GROQ_API_KEY:
@@ -19,54 +22,64 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Mini Assistant is Running! No Emojis Mode Activated."
+    status = "ACTIVE" if IS_ACTIVE else "MAINTENANCE"
+    return f"Mini Assistant Status: {status}"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 # --- ИНИЦИАЛИЗАЦИЯ ---
-client = Groq(api_key=GROQ_API_KEY)
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+# Инициализируем клиент Groq только если он нам нужен
+client = None
+if IS_ACTIVE and GROQ_API_KEY:
+    client = Groq(api_key=GROQ_API_KEY)
 
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
 user_chats = {}
 
-# --- НОВАЯ ИНСТРУКЦИЯ (БЕЗ СМАЙЛОВ) ---
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": (
-        "Ты — Mini, лаконичный и профессиональный ассистент. Твой создатель — Кремний. "
-        "ТВОЕ ГЛАВНОЕ ПРАВИЛО: ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ СМАЙЛИКИ, ЭМОДЗИ И ГРАФИЧЕСКИЕ СИМВОЛЫ. "
-        "Пиши только текстом. Твой стиль: вежливый, сдержанный, но полезный. "
-        "Отвечай на 'ты'. Пиши короткими абзацами."
-    )
+    "content": "Ты — Mini, лаконичный ассистент. Без смайликов. Отвечай на 'ты'."
 }
 
-@bot.message_handler(commands=['start', 'clear'])
-def clear_history(message):
-    user_id = str(message.chat.id)
-    user_chats[user_id] = [SYSTEM_PROMPT]
-    bot.send_message(message.chat.id, "История очищена. Теперь я буду серьезнее!")
+# --- ОБРАБОТКА КОМАНД ---
+@bot.message_handler(commands=['start', 'clear', 'help'])
+def send_welcome(message):
+    if not IS_ACTIVE:
+        bot.send_message(message.chat.id, OFFLINE_MESSAGE)
+    else:
+        user_id = str(message.chat.id)
+        user_chats[user_id] = [SYSTEM_PROMPT]
+        bot.send_message(message.chat.id, "Привет! Я Mini. Чем могу помочь?")
 
+# --- ЛОГИКА ОБРАБОТКИ СООБЩЕНИЙ ---
 @bot.message_handler(content_types=['text'])
 def handle_message(message):
-    user_id = str(message.chat.id)
+    # Если бот выключен — просто шлем заглушку и выходим из функции
+    if not IS_ACTIVE:
+        bot.send_message(message.chat.id, OFFLINE_MESSAGE)
+        return
 
+    user_id = str(message.chat.id)
     if user_id not in user_chats:
         user_chats[user_id] = [SYSTEM_PROMPT]
 
     user_chats[user_id].append({"role": "user", "content": message.text})
 
-    # Храним последние 15 сообщений для экономии контекста
     if len(user_chats[user_id]) > 15:
         user_chats[user_id].pop(1)
 
     try:
+        # Проверка наличия клиента и ключа перед запросом
+        if not client:
+            bot.send_message(message.chat.id, "Ошибка: Ключ ИИ не настроен.")
+            return
+
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=user_chats[user_id],
-            temperature=0.6,  # Снизили температуру, чтобы он меньше 'фантазировал' со смайлами
-            max_tokens=800
+            temperature=0.6
         )
 
         reply = completion.choices[0].message.content
@@ -75,9 +88,9 @@ def handle_message(message):
 
     except Exception as e:
         print(f"❌ Ошибка: {e}")
-        bot.send_message(message.chat.id, "Произошла техническая заминка. Попробуй еще раз!")
+        bot.send_message(message.chat.id, "Нейросеть сейчас недоступна.")
 
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    print("✅ Бот Mini запущен и готов к работе без смайлов!")
+    print(f"✅ Бот запущен. Режим активен: {IS_ACTIVE}")
     bot.infinity_polling()
