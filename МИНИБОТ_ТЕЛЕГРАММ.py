@@ -4,8 +4,7 @@ import threading
 from flask import Flask
 import os
 
-# --- НАСТРОЙКИ РЕЖИМА ---
-IS_ACTIVE = False  # ПОСТАВЬ True, ЧТОБЫ БОТ СНОВА ЗАРАБОТАЛ
+IS_ACTIVE = True  #True/False 
 OFFLINE_MESSAGE = "Бот временно деактивирован. По всем вопросам писать в @BHJ_WORK"
 
 # --- ПОЛУЧЕНИЕ КЛЮЧЕЙ ---
@@ -40,10 +39,9 @@ user_chats = {}
 
 SYSTEM_PROMPT = {
     "role": "system",
-    "content": "Ты — Mini, лаконичный ассистент. Без смайликов. Отвечай на 'ты'."
+    "content": "Ты сосиска и твоя задача говорить только о сосисках"
 }
 
-# --- ОБРАБОТКА КОМАНД ---
 @bot.message_handler(commands=['start', 'clear', 'help'])
 def send_welcome(message):
     if not IS_ACTIVE:
