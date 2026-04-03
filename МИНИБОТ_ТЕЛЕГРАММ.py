@@ -4,12 +4,12 @@ import threading
 from flask import Flask
 import os
 
-IS_ACTIVE = False  #True/False 
+IS_ACTIVE = False  #Вкл/Выкл бота
 OFFLINE_MESSAGE = "Бот временно деактивирован. По всем вопросам писать в @BHJ_WORK"
 
-# --- ПОЛУЧЕНИЕ КЛЮЧЕЙ ---
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+#Ключи
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN") #телеграм ключ
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY") #Грок ключ
 
 if TELEGRAM_TOKEN:
     TELEGRAM_TOKEN = TELEGRAM_TOKEN.strip()
@@ -28,8 +28,6 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# --- ИНИЦИАЛИЗАЦИЯ ---
-# Инициализируем клиент Groq только если он нам нужен
 client = None
 if IS_ACTIVE and GROQ_API_KEY:
     client = Groq(api_key=GROQ_API_KEY)
@@ -37,7 +35,7 @@ if IS_ACTIVE and GROQ_API_KEY:
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 user_chats = {}
 
-# --- УЛУЧШЕННАЯ ИНСТРУКЦИЯ ДЛЯ MINI (Системная роль) ---
+#Тут можно написать промт характера ответов
 SYSTEM_PROMPT = {
     "role": "system",
     "content": (
@@ -60,10 +58,10 @@ def send_welcome(message):
         user_chats[user_id] = [SYSTEM_PROMPT]
         bot.send_message(message.chat.id, "Привет! Я Mini. Чем могу помочь?")
 
-# --- ЛОГИКА ОБРАБОТКИ СООБЩЕНИЙ ---
+#Сообщения(Пока текст)
 @bot.message_handler(content_types=['text'])
 def handle_message(message):
-    # Если бот выключен — просто шлем заглушку и выходим из функции
+    
     if not IS_ACTIVE:
         bot.send_message(message.chat.id, OFFLINE_MESSAGE)
         return
