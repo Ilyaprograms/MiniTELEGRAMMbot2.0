@@ -4,7 +4,7 @@ import threading
 from flask import Flask
 import os
 
-IS_ACTIVE = False  #Вкл/Выкл бота
+IS_ACTIVE = True  #Вкл/Выкл бота
 OFFLINE_MESSAGE = "Бот временно деактивирован. По всем вопросам писать в @BHJ_WORK"
 
 #Ключи
